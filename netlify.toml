@@ -1,0 +1,47 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+  functions = ".netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_FLAGS = "--legacy-peer-deps"
+  PRISMA_GENERATE_FLAG = "true"
+  PRISMA_SKIP_POSTINSTALL_GENERATE = "true"
+
+# Redirections pour le routage côté client
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Configuration des fonctions serverless
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["@prisma/client", "prisma"]
+
+# Configuration pour l'environnement de développement
+[dev]
+  command = "npm run dev"
+  targetPort = 3000
+  publish = ".next"
+  autoLaunch = false
+
+# Configuration des en-têtes pour les fichiers statiques
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "same-origin"
+    
+# Configuration pour le déploiement continu
+[context.production.environment]
+  NODE_ENV = "production"
+  
+[context.deploy-preview.environment]
+  NODE_ENV = "staging"
+  
+[context.branch-deploy.environment]
+  NODE_ENV = "staging"
