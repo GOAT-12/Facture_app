@@ -1,7 +1,7 @@
 [build]
   command = "npm run build"
   publish = ".next"
-  functions = ".netlify/functions"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
@@ -9,7 +9,13 @@
   PRISMA_GENERATE_FLAG = "true"
   PRISMA_SKIP_POSTINSTALL_GENERATE = "true"
 
-# Redirections pour le routage côté client
+# Configuration des redirections
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/server/:splat"
+  status = 200
+
+# Redirection pour le routage côté client (SPA Fallback)
 [[redirects]]
   from = "/*"
   to = "/index.html"
