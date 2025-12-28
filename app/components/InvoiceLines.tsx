@@ -1,63 +1,130 @@
-import React from 'react'
-import { Invoice } from '@/type'
-import { Plus, Trash } from 'lucide-react'
-import { InvoiceLine } from '@prisma/client'
+import React, { useCallback } from 'react';
+import { Plus, Trash } from 'lucide-react';
+import { Invoice, type InvoiceLine } from '@/type';
+import { logger } from '@/lib/logger';
 
 interface Props {
-  invoice: Invoice
-  setInvoice: (invoice: Invoice) => void
+  invoice: Invoice;
+  setInvoice: (invoice: Invoice) => void;
 }
 
 const InvoiceLines: React.FC<Props> = ({ invoice, setInvoice }) => {
+  const handleAddLine = useCallback(() => {
+    try {
+      const newLine: InvoiceLine = {
+        id: crypto.randomUUID(),
+        description: '',
+        quantity: 1,
+        unitPrice: 0,
+        invoiceId: invoice.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
 
-  const handleAddLine = () => {
-    const newLine: InvoiceLine = {
-      id: crypto.randomUUID(),
-      description: '',
-      quantity: 1,
-      unitPrice: 0,
-      invoiceId: invoice.id
+      setInvoice({
+        ...invoice,
+        lines: [...invoice.lines, newLine],
+      });
+    } catch (error) {
+      logger.error('Failed to add invoice line', { error });
     }
+  }, [invoice, setInvoice]);
 
-    setInvoice({
-      ...invoice,
-      lines: [...invoice.lines, newLine]
-    })
-  }
+  const handleRemoveLine = useCallback((index: number) => {
+    try {
+      if (index < 0 || index >= invoice.lines.length) {
+        throw new Error('Invalid line index');
+      }
 
-  const handleRemoveLine = (index: number) => {
-    const newLines = invoice.lines.filter((_, i) => i !== index)
-    setInvoice({ ...invoice, lines: newLines })
-  }
+      const newLines = invoice.lines.filter((_, i) => i !== index);
+      setInvoice({ ...invoice, lines: newLines });
+    } catch (error) {
+      logger.error('Failed to remove invoice line', { error, index });
+    }
+  }, [invoice, setInvoice]);
 
-  const handleQuantityChange = (index: number, value: string) => {
-    const updatedLines = [...invoice.lines]
-    updatedLines[index].quantity = value === "" ? 0 : parseInt(value)
-    setInvoice({ ...invoice, lines: updatedLines })
-  }
+  const handleQuantityChange = useCallback((index: number, value: string) => {
+    try {
+      const quantity = value === '' ? 0 : Math.max(0, parseInt(value, 10) || 0);
 
-  const handleDescriptionChange = (index: number, value: string) => {
-    const updatedLines = [...invoice.lines]
-    updatedLines[index].description = value
-    setInvoice({ ...invoice, lines: updatedLines })
-  }
+      setInvoice(prevInvoice => {
+        const updatedLines = [...prevInvoice.lines];
+        updatedLines[index] = { ...updatedLines[index], quantity };
+        return { ...prevInvoice, lines: updatedLines };
+      });
+    } catch (error) {
+      logger.error('Failed to update quantity', { error, index, value });
+    }
+  }, [setInvoice]);
 
-  const handleUnitPriceChange = (index: number, value: string) => {
-    const updatedLines = [...invoice.lines]
-    updatedLines[index].unitPrice = value === "" ? 0 : parseFloat(value)
-    setInvoice({ ...invoice, lines: updatedLines })
-  }
+  const handleDescriptionChange = useCallback((index: number, value: string) => {
+    try {
+      setInvoice(prevInvoice => {
+        const updatedLines = [...prevInvoice.lines];
+        updatedLines[index] = { ...updatedLines[index], description: value };
+        return { ...prevInvoice, lines: updatedLines };
+      });
+    } catch (error) {
+      logger.error('Failed to update description', { error, index, value });
+    }
+  }, [setInvoice]);
 
-  const updateLine = (
+  const handleUnitPriceChange = useCallback((index: number, value: string) => {
+    try {
+      // Remplacer les virgules par des points et convertir en nombre
+      const numericValue = parseFloat(
+        value.replace(',', '.').replace(/[^0-9.-]+/g, '')
+      ) || 0;
+
+      // Arrondir à 2 décimales
+      const roundedValue = Math.round(numericValue * 100) / 100;
+
+      setInvoice(prevInvoice => {
+        const updatedLines = [...prevInvoice.lines];
+        updatedLines[index] = { ...updatedLines[index], unitPrice: roundedValue };
+        return { ...prevInvoice, lines: updatedLines };
+      });
+    } catch (error) {
+      logger.error('Failed to update unit price', { error, index, value });
+    }
+  }, [setInvoice]);
+
+  const updateLine = useCallback((
     index: number,
     field: keyof InvoiceLine,
     value: string | number
   ) => {
-    const newLines = [...invoice.lines]
-    // @ts-ignore
-    newLines[index][field] = value
-    setInvoice({ ...invoice, lines: newLines })
-  }
+    try {
+      setInvoice(prevInvoice => {
+        const newLines = [...prevInvoice.lines];
+
+        // Validation du type en fonction du champ
+        if (field === 'quantity') {
+          newLines[index] = {
+            ...newLines[index],
+            [field]: typeof value === 'string' ? parseInt(value, 10) || 0 : value
+          };
+        } else if (field === 'unitPrice') {
+          const numericValue = typeof value === 'string' ?
+            parseFloat(value) || 0 :
+            value;
+          newLines[index] = {
+            ...newLines[index],
+            [field]: Math.round(numericValue * 100) / 100 // Arrondir à 2 décimales
+          };
+        } else {
+          newLines[index] = {
+            ...newLines[index],
+            [field]: value
+          };
+        }
+
+        return { ...prevInvoice, lines: newLines };
+      });
+    } catch (error) {
+      logger.error('Failed to update line', { error, index, field, value });
+    }
+  }, [setInvoice]);
 
   return (
     <div className="h-fit bg-base-200 rounded-xl w-full p-5">
